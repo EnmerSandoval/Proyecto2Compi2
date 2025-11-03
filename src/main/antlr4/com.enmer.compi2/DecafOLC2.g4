@@ -79,11 +79,16 @@ sentencia
     | doWhileStmt
     | forStmt
     | switchStmt
+    | printStmt
     | 'break' ';'
     | 'continue' ';'
     | 'return' expr? ';'
     | expr ';'
     | ';'
+    ;
+
+printStmt
+    : 'print' '(' (expr (',' expr)*)? ')' ';'
     ;
 
 ifStmt
