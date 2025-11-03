@@ -25,25 +25,25 @@ public class SemanticChecker extends DecafOLC2BaseVisitor<Void> {
         String name = ctx.IDENT(0).getText();
         currentClass = global.getClass(name);
 
-        if (currentClass.superName != null) {
-            if (global.getClass(currentClass.superName) == null) {
-                reporter.add(new CompileError(
-                        "Semantico",
-                        "La superclase '" + currentClass.superName + "' no existe.",
-                        ctx.start.getLine(),
-                        ctx.start.getCharPositionInLine(),
-                        currentFile
-                ));
-            }
+        if (currentClass.getSuperName() != null && !global.hasClass(currentClass.getSuperName())) {
+            reporter.add(new CompileError("Semantico",
+                    "La superclase '" + currentClass.getSuperName() + "' no existe.",
+                    ctx.start.getLine(), ctx.start.getCharPositionInLine(), currentFile));
         }
 
-        for (var m : ctx.miembroClase()) {
-            visit(m);
+        String cycleAt = global.detectInheritanceCycle(name);
+        if (cycleAt != null) {
+            reporter.add(new CompileError("Semantico",
+                    "Ciclo de herencia detectado comenzando en '" + cycleAt + "'.",
+                    ctx.start.getLine(), ctx.start.getCharPositionInLine(), currentFile));
         }
+
+        for (var m : ctx.miembroClase()) visit(m);
 
         currentClass = null;
         return null;
     }
+
 
     @Override
     public Void visitMetodoDecl(DecafOLC2Parser.MetodoDeclContext ctx) {

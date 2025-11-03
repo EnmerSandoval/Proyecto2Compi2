@@ -4,16 +4,45 @@
  */
 package com.enmer.compi2.vista;
 
+import com.enmer.compi2.DecafOLC2Lexer;
+import com.enmer.compi2.DecafOLC2Parser;
+import com.enmer.compi2.errors.CompileError;
+import com.enmer.compi2.errors.ErrorReporter;
 import com.enmer.compi2.projects.FileModel;
 import com.enmer.compi2.projects.PackageModel;
 import com.enmer.compi2.projects.ProjectModel;
 import com.enmer.compi2.projects.ProjectXML;
+import com.enmer.compi2.semantico.ClassSymbol;
+import com.enmer.compi2.semantico.GlobalScope;
+import com.enmer.compi2.semantico.MemberCollector;
+import com.enmer.compi2.semantico.MethodSymbol;
+import com.enmer.compi2.semantico.SymbolCollector;
+import com.enmer.compi2.semantico.TypeResolver;
 import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextPane;
+import javax.swing.WindowConstants;
+import javax.swing.event.TreeSelectionEvent;
+import javax.swing.event.TreeSelectionListener;
+import javax.swing.table.AbstractTableModel;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
+import org.antlr.v4.runtime.BaseErrorListener;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.RecognitionException;
+import org.antlr.v4.runtime.Recognizer;
 
 /**
  *
@@ -21,7 +50,9 @@ import javax.swing.tree.DefaultTreeModel;
  */
 public class IDERecaf extends javax.swing.JFrame {
     ProjectModel projectModel;
-    
+    private Path projectRoot;        
+    private Path currentFilePath; 
+    private boolean treeHooked = false;      
 
     /**
      * Creates new form IDE
@@ -30,6 +61,9 @@ public class IDERecaf extends javax.swing.JFrame {
         initComponents();
         setLocationRelativeTo(null);
         setTitle("IDE");
+        projectModel   = null;
+        projectRoot    = null;       
+        currentFilePath = null;
     }
 
     /**
@@ -48,6 +82,7 @@ public class IDERecaf extends javax.swing.JFrame {
         jLabel1 = new javax.swing.JLabel();
         jScrollPane3 = new javax.swing.JScrollPane();
         jTextArea1 = new javax.swing.JTextArea();
+        jButton1 = new javax.swing.JButton();
         jMenuBar1 = new javax.swing.JMenuBar();
         jMenu1 = new javax.swing.JMenu();
         newProjectButton = new javax.swing.JMenuItem();
@@ -61,6 +96,8 @@ public class IDERecaf extends javax.swing.JFrame {
         compileButton = new javax.swing.JMenuItem();
         jMenu3 = new javax.swing.JMenu();
         downloadButton = new javax.swing.JMenuItem();
+        jMenu4 = new javax.swing.JMenu();
+        jMenuItem1 = new javax.swing.JMenuItem();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -74,6 +111,13 @@ public class IDERecaf extends javax.swing.JFrame {
         jTextArea1.setRows(5);
         jScrollPane3.setViewportView(jTextArea1);
 
+        jButton1.setText("Compilar");
+        jButton1.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton1ActionPerformed(evt);
+            }
+        });
+
         jMenu1.setText("Opciones");
 
         newProjectButton.setText("Nuevo Proyecto");
@@ -85,6 +129,11 @@ public class IDERecaf extends javax.swing.JFrame {
         jMenu1.add(newProjectButton);
 
         newFileButton.setText("Nuevo Archivo");
+        newFileButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                newFileButtonActionPerformed(evt);
+            }
+        });
         jMenu1.add(newFileButton);
 
         openProjectButton.setText("Abrir Proyecto");
@@ -96,15 +145,35 @@ public class IDERecaf extends javax.swing.JFrame {
         jMenu1.add(openProjectButton);
 
         openFileButton.setText("Abrir Archivo");
+        openFileButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                openFileButtonActionPerformed(evt);
+            }
+        });
         jMenu1.add(openFileButton);
 
         saveButton.setText("Guardar");
+        saveButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                saveButtonActionPerformed(evt);
+            }
+        });
         jMenu1.add(saveButton);
 
         saveAsButton.setText("Guardar Como");
+        saveAsButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                saveAsButtonActionPerformed(evt);
+            }
+        });
         jMenu1.add(saveAsButton);
 
         closeProjectButton.setText("Cerrar Proyecto");
+        closeProjectButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                closeProjectButtonActionPerformed(evt);
+            }
+        });
         jMenu1.add(closeProjectButton);
 
         jMenuBar1.add(jMenu1);
@@ -123,6 +192,18 @@ public class IDERecaf extends javax.swing.JFrame {
 
         jMenuBar1.add(jMenu3);
 
+        jMenu4.setText("Console");
+
+        jMenuItem1.setText("Clean Console");
+        jMenuItem1.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jMenuItem1ActionPerformed(evt);
+            }
+        });
+        jMenu4.add(jMenuItem1);
+
+        jMenuBar1.add(jMenu4);
+
         setJMenuBar(jMenuBar1);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -134,25 +215,29 @@ public class IDERecaf extends javax.swing.JFrame {
                 .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 258, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addComponent(jScrollPane2)
-                    .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 76, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 1365, Short.MAX_VALUE))
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                        .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 76, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(986, 986, 986)
+                        .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(jScrollPane3, javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addComponent(jScrollPane2))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jScrollPane1)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                    .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 758, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addGroup(layout.createSequentialGroup()
                         .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 499, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(18, 18, 18)
-                        .addComponent(jLabel1)
-                        .addGap(18, 18, 18)
-                        .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 274, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(0, 0, Short.MAX_VALUE)))
-                .addContainerGap())
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(jLabel1)
+                            .addComponent(jButton1))
+                        .addGap(10, 10, 10)
+                        .addComponent(jScrollPane3)))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         pack();
@@ -176,12 +261,167 @@ public class IDERecaf extends javax.swing.JFrame {
 
         try {
             this.projectModel = ProjectXML.load(xml.toPath());
+            this.projectModel = ProjectXML.load(xml.toPath());
+            try {
+                this.projectRoot = projectModel.getRoot();    
+            } catch (Throwable ignore) {
+                this.projectRoot = xml.toPath().getParent();  
+            }
             cargarProyectoEnArbol();            
         } catch (Exception e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(this, "No se pudo abrir: " + e.getMessage());
         }
     }//GEN-LAST:event_openProjectButtonActionPerformed
+
+    private void newFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_newFileButtonActionPerformed
+        // TODO add your handling code here:
+        crearNuevoArchivo();
+    }//GEN-LAST:event_newFileButtonActionPerformed
+
+    private void crearNuevoArchivo() {
+        if (projectModel == null || projectRoot == null) {
+            JOptionPane.showMessageDialog(this, "Primero crea o abre un proyecto.");
+            return;
+        }
+
+        String pkg = JOptionPane.showInputDialog(this, "Paquete— vacío para ninguno:", "");
+        if (pkg == null) return;
+
+        String baseName = JOptionPane.showInputDialog(this, "Nombre de archivo (sin extensión):", "Main");
+        if (baseName == null || baseName.isBlank()) return;
+
+        String fileName = baseName.endsWith(".decaf") ? baseName : baseName + ".decaf";
+        Path targetDir = (pkg.isBlank())
+                ? projectRoot
+                : projectRoot.resolve(pkg.replace('.', File.separatorChar));
+
+        try {
+            Files.createDirectories(targetDir);
+            Path file = targetDir.resolve(fileName);
+
+            if (Files.exists(file)) {
+                int ans = JOptionPane.showConfirmDialog(this, "El archivo ya existe. ¿Sobrescribir?",
+                        "Confirmar", JOptionPane.YES_NO_OPTION);
+                if (ans != JOptionPane.YES_OPTION) return;
+            }
+
+            String plantilla = """
+                    // %s
+                    // Paquete: %s
+                    class %s {
+                        // TODO
+                    }
+                    """.formatted(fileName, (pkg.isBlank() ? "<default>" : pkg), baseName);
+
+            Files.writeString(file, plantilla, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+
+            currentFilePath = file;
+            jTextPane1.setText(plantilla);
+            jTextArea1.append("Creado: " + file + System.lineSeparator());
+            updateXmlAddFile(pkg, file);
+
+            // refresca árbol
+            cargarProyectoEnArbol();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "No se pudo crear el archivo: " + ex.getMessage());
+        }
+    }
+
+    private void abrirArchivoDesdeChooser() {
+        JFileChooser chooser = new JFileChooser(projectRoot != null ? projectRoot.toFile() : null);
+        chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        int res = chooser.showOpenDialog(this);
+        if (res != JFileChooser.APPROVE_OPTION) return;
+        abrirEnEditor(chooser.getSelectedFile().toPath());
+    }
+
+    private void abrirEnEditor(Path p) {
+        try {
+            String content = Files.readString(p);
+            jTextPane1.setText(content);
+            currentFilePath = p;
+            jTextArea1.append("Abierto: " + p + System.lineSeparator());
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "No se pudo abrir: " + e.getMessage());
+        }
+    }
+
+    private void guardarArchivo() {
+        try {
+            if (currentFilePath == null) { guardarArchivoComo(); return; }
+            Files.writeString(currentFilePath, jTextPane1.getText(),
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            jTextArea1.append("Guardado: " + currentFilePath + System.lineSeparator());
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "No se pudo guardar: " + e.getMessage());
+        }
+    }
+
+    private void guardarArchivoComo() {
+        JFileChooser chooser = new JFileChooser(projectRoot != null ? projectRoot.toFile() : null);
+        chooser.setDialogTitle("Guardar como...");
+        int res = chooser.showSaveDialog(this);
+        if (res != JFileChooser.APPROVE_OPTION) return;
+        try {
+            Path p = chooser.getSelectedFile().toPath();
+            Files.writeString(p, jTextPane1.getText(),
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            currentFilePath = p;
+            jTextArea1.append("Guardado como: " + currentFilePath + System.lineSeparator());
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "No se pudo guardar: " + e.getMessage());
+        }
+    }
+
+    private void cerrarProyecto() {
+         try { if (projectModel != null) saveProject(); } catch (Exception ignore) {}
+
+            projectModel    = null;
+            projectRoot     = null;
+            currentFilePath = null;
+
+            treeProyecto.setModel(new DefaultTreeModel(new DefaultMutableTreeNode("(sin proyecto)")));
+            jTextPane1.setText("");
+            jTextArea1.setText("");
+            jTextArea1.append("Proyecto cerrado." + System.lineSeparator());
+
+    }
+
+    
+    private void closeProjectButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_closeProjectButtonActionPerformed
+        // TODO add your handling code here:
+        cerrarProyecto();
+    }//GEN-LAST:event_closeProjectButtonActionPerformed
+
+    private void openFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openFileButtonActionPerformed
+        // TODO add your handling code here:
+        abrirArchivoDesdeChooser();
+    }//GEN-LAST:event_openFileButtonActionPerformed
+
+    private void saveAsButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveAsButtonActionPerformed
+        // TODO add your handling code here:
+        guardarArchivoComo();
+    }//GEN-LAST:event_saveAsButtonActionPerformed
+
+    private void saveButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveButtonActionPerformed
+        // TODO add your handling code here:
+        guardarArchivo();
+    }//GEN-LAST:event_saveButtonActionPerformed
+
+    private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
+        // TODO add your handling code here:
+        compilarActual();
+    }//GEN-LAST:event_jButton1ActionPerformed
+
+    private void jMenuItem1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem1ActionPerformed
+        // TODO add your handling code here:
+        jTextArea1.setText("");
+    }//GEN-LAST:event_jMenuItem1ActionPerformed
 
     private void crearNuevoProyecto(){
         try {
@@ -208,6 +448,8 @@ public class IDERecaf extends javax.swing.JFrame {
 
             Path root = carpeta.toPath().resolve(nombre); 
             this.projectModel = ProjectXML.createNew(nombre, root);
+            this.projectRoot = root; 
+            
 
             cargarProyectoEnArbol();
             
@@ -225,26 +467,407 @@ public class IDERecaf extends javax.swing.JFrame {
     private void cargarProyectoEnArbol() {
         if (projectModel == null) return;
 
-        DefaultMutableTreeNode rootNode =
-                new DefaultMutableTreeNode(projectModel.getName());
+        DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode(projectModel.getName());
 
         for (PackageModel pkg : projectModel.getPackages()) {
-            DefaultMutableTreeNode pkgNode =
-                    new DefaultMutableTreeNode(pkg.getName());
+            DefaultMutableTreeNode pkgNode = new DefaultMutableTreeNode(pkg.getName());
 
             for (FileModel fm : pkg.getFiles()) {
-                DefaultMutableTreeNode fileNode =
-                        new DefaultMutableTreeNode(fm.getName());
+                Path filePath = null;
+
+                String p = fm.getPath();
+                if (p != null && !p.isBlank()) {
+                    Path fromXml = Paths.get(p);
+                    filePath = fromXml.isAbsolute()
+                            ? fromXml.normalize()
+                            : (projectRoot != null ? projectRoot.resolve(fromXml).normalize() : fromXml.normalize());
+                }
+
+                if (filePath == null && projectRoot != null) {
+                    Path pkgDir = pkg.getName().equals("default")
+                            ? projectRoot
+                            : projectRoot.resolve(pkg.getName().replace('.', File.separatorChar));
+                    filePath = pkgDir.resolve(fm.getName()).normalize();
+                }
+
+                DefaultMutableTreeNode fileNode = new DefaultMutableTreeNode(
+                        (filePath != null) ? filePath : fm.getName()
+                );
                 pkgNode.add(fileNode);
             }
-
             rootNode.add(pkgNode);
         }
 
-        DefaultTreeModel model = new DefaultTreeModel(rootNode);
-        treeProyecto.setModel(model);
+        treeProyecto.setModel(new DefaultTreeModel(rootNode));
+
+        if (!treeHooked) {
+            treeHooked = true;
+            treeProyecto.addTreeSelectionListener(new TreeSelectionListener() {
+                @Override public void valueChanged(TreeSelectionEvent e) {
+                    var sel = treeProyecto.getLastSelectedPathComponent();
+                    if (!(sel instanceof DefaultMutableTreeNode)) return;
+                    DefaultMutableTreeNode node = (DefaultMutableTreeNode) sel;
+                    Object uo = node.getUserObject();
+                    if (uo instanceof Path) {
+                        Path p = (Path) uo;
+                        if (Files.isRegularFile(p)) {
+                            abrirEnEditor(p); 
+                        }
+                    }
+                }
+            });
+        }
     }
+
+    
+    private void compilarActual() {
+        jTextArea1.append("== Compilando ==\n");
+        String source = jTextPane1.getText();
+        if (source == null) source = "";
+
+        ErrorReporter reporter = new ErrorReporter();
+        String fileName = (currentFilePath != null) ? currentFilePath.toString() : "<sin-archivo>";
+
+        DecafOLC2Lexer lexer = new DecafOLC2Lexer(org.antlr.v4.runtime.CharStreams.fromString(source));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(new com.enmer.compi2.errors.IDEErrorListener(reporter, fileName, "Léxico"));
+
+        org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
+        DecafOLC2Parser parser = new DecafOLC2Parser(tokens);
+        parser.removeErrorListeners();
+        parser.addErrorListener(new com.enmer.compi2.errors.IDEErrorListener(reporter, fileName, "Sintaxis"));
+
+        DecafOLC2Parser.ProgramaContext tree = parser.programa();
+
+        if (reporter.hasErrors()) {
+            for (CompileError err : reporter.getErrors()) {
+                jTextArea1.append(err.toString() + System.lineSeparator());
+            }
+            showErrorTableWindowSimple(reporter);
+            jTextArea1.append("== Fin (errores de sintaxis/lex) ==\n");
+            return;
+        }
+
+        GlobalScope global = new GlobalScope();
+        new SymbolCollector(global, reporter).visit(tree);
+
+        MemberCollector mc = new MemberCollector(global, reporter);
+        mc.setCurrentFile(fileName);
+        mc.visit(tree);
+
+        TypeResolver tr = new TypeResolver(global, reporter);
+        tr.setCurrentFile(fileName);
+        tr.visit(tree);
+
+        if (reporter.hasErrors()) {
+            for (CompileError err : reporter.getErrors()) {
+                jTextArea1.append(err.toString() + System.lineSeparator());
+            }
+            showErrorTableWindowSimple(reporter);
+            jTextArea1.append("== Fin (errores semánticos) ==\n");
+            return;
+        }
+
+        jTextArea1.append("OK: Sin errores.\n");
+        showSymbolTableWindow(global);
+        jTextArea1.append("== Fin ==\n");
+    }
+
+
+    private String renderSymbolTable(GlobalScope global) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n--- TABLA DE SIMBOLOS ---\n");
+        for (ClassSymbol c : global.getAll()) {
+            sb.append("class ").append(c.getName());
+            if (c.getSuperName() != null) sb.append(" : ").append(c.getSuperName());
+            sb.append("\n");
+
+            if (!c.getFields().isEmpty()) {
+                sb.append("  fields\n");
+                c.getFields().forEach((n, f) -> sb.append("  ").append(f.type).append(" ").append(f.name).append(";\n"));
+            }
+            if (!c.getMethods().isEmpty()) {
+                sb.append("   methods\n");
+                c.getMethods().forEach((n, m) -> {
+                    sb.append("  ").append(m.returnType).append(" ").append(m.name).append("(");
+                    for (int i = 0; i < m.params.size(); i++) {
+                        var p = m.params.get(i);
+                        if (i > 0) sb.append(", ");
+                        sb.append(p.type).append(" ").append(p.name);
+                    }
+                    sb.append(")\n");
+                });
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+    
+    private String normalizePath(String p) {
+        return (p == null) ? "" : p.replace('\\', '/');
+    }
+    
+    private void saveProject() {
+        try {
+            Path xml = projectRoot.resolve("project.xml");
+            ProjectXML.save(projectModel, xml);
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "No se pudo guardar project.xml: " + e.getMessage());
+        }
+    }
+
+
+    private void updateXmlAddFile(String pkgName, Path absoluteFile) {
+        try {
+            String fileName = absoluteFile.getFileName().toString();
+            String relPath = (projectRoot != null)
+                    ? normalizePath(projectRoot.relativize(absoluteFile).toString())
+                    : normalizePath(fileName);
+
+            PackageModel target = null;
+            for (PackageModel p : projectModel.getPackages()) {
+                if (p.getName().equals(pkgName)) { target = p; break; }
+            }
+            if (target == null) {
+                target = new PackageModel(pkgName);      
+                projectModel.getPackages().add(target);
+            }
+
+            boolean exists = false;
+            for (FileModel fm : target.getFiles()) {
+                if (normalizePath(fm.getPath()).equals(relPath) || fm.getName().equals(fileName)) {
+                    exists = true; break;
+                }
+            }
+            if (!exists) {
+                target.getFiles().add(new FileModel(fileName, relPath));
+            }
+
+            saveProject();
+            reloadProjectFromDisk();
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "No se pudo actualizar project.xml: " + ex.getMessage());
+        }
+    }
+
+
+    private void reloadProjectFromDisk() {
+        try {
+            Path xml = (projectRoot != null) ? projectRoot.resolve("project.xml") : null;
+            if (xml == null || !Files.exists(xml)) {
+                return;
+            }
+            this.projectModel = ProjectXML.load(xml);
+            cargarProyectoEnArbol();
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "No se pudo recargar el proyecto: " + e.getMessage());
+        }
+    }
+
+
+    
+    private static class SymRow {
+        final String scope, kind, name, typeOrSig;
+        SymRow(String scope, String kind, String name, String typeOrSig) {
+            this.scope = scope; this.kind = kind; this.name = name; this.typeOrSig = typeOrSig;
+        }
+    }
+
+    private static class SymbolTableModel extends AbstractTableModel {
+        private final String[] cols = {"Scope", "Kind", "Name", "Type / Signature"};
+        private List<SymRow> rows = new ArrayList<>();
+
+        public void setRows(List<SymRow> r) { this.rows = r; fireTableDataChanged(); }
+
+        @Override public int getRowCount() { return rows.size(); }
+        @Override public int getColumnCount() { return cols.length; }
+        @Override public String getColumnName(int c) { return cols[c]; }
+        @Override public Object getValueAt(int r, int c) {
+            SymRow row = rows.get(r);
+            return switch (c) {
+                case 0 -> row.scope;
+                case 1 -> row.kind;
+                case 2 -> row.name;
+                case 3 -> row.typeOrSig;
+                default -> "";
+            };
+        }
+    }
+
+    private List<SymRow> collectSymbolRows(GlobalScope global) {
+        List<SymRow> out = new ArrayList<>();
+
+        var classes = new ArrayList<>(global.getAll());
+        classes.sort(Comparator.comparing(ClassSymbol::getName));
+
+        for (var c : classes) {
+            out.add(new SymRow(
+                    "Global",
+                    "class",
+                    c.getName(),
+                    (c.getSuperName() != null && !c.getSuperName().isBlank())
+                            ? "extends " + c.getSuperName()
+                            : ""
+            ));
+
+            var fields = new ArrayList<>(c.getFields().entrySet());
+            fields.sort(Comparator.comparing(e -> e.getKey()));
+            for (var e : fields) {
+                out.add(new SymRow(
+                        "Global::" + c.getName(),
+                        "field",
+                        e.getKey(),
+                        showType(e.getValue().type)
+                ));
+            }
+
+            var methods = new ArrayList<>(c.getMethods().entrySet());
+            methods.sort(Comparator.comparing(e -> e.getKey()));
+            for (var me : methods) {
+                var m = me.getValue();
+                boolean isCtor = m.name.equals(c.getName());
+                String ret = isCtor ? "void" : showType(m.returnType);
+                String sig = m.name + "(" + paramsToString(m) + ") : " + ret;
+
+                String mScope = "Global::" + c.getName();
+                out.add(new SymRow(mScope, (isCtor ? "ctor" : "method"), m.name, sig));
+
+                String inner = mScope + "::" + m.name;
+                out.add(new SymRow(inner, "param", "this", c.getName()));
+                for (var p : m.params) {
+                    out.add(new SymRow(inner, "param", p.name, showType(p.type)));
+                }
+            }
+        }
+        return out;
+    }
+
+    private void showSymbolTableWindow(GlobalScope global) {
+        List<SymRow> rows = collectSymbolRows(global);
+        SymbolTableModel model = new SymbolTableModel();
+        model.setRows(rows);
+
+        JTable table = new JTable(model);
+        table.setAutoCreateRowSorter(true);
+        table.setFillsViewportHeight(true);
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
+        table.getColumnModel().getColumn(0).setPreferredWidth(260); // Scope
+        table.getColumnModel().getColumn(1).setPreferredWidth(80);  // Kind
+        table.getColumnModel().getColumn(2).setPreferredWidth(180); // Name
+        table.getColumnModel().getColumn(3).setPreferredWidth(420); // Type/Signature
+
+        JDialog dlg = new JDialog(this, "Symbol Table", false);
+        dlg.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        dlg.getContentPane().add(new JScrollPane(table));
+        dlg.setSize(980, 420);
+        dlg.setLocationRelativeTo(this);
+        dlg.setVisible(true);
+    }
+    
+    private void showErrorTableWindowSimple(ErrorReporter reporter) {
+        String[] cols = {"Phase", "File", "Line", "Col", "Message"};
+        javax.swing.table.DefaultTableModel model = new javax.swing.table.DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override public Class<?> getColumnClass(int c) { return (c==2 || c==3) ? Integer.class : String.class; }
+        };
+
+        for (CompileError e : reporter.getErrors()) {
+            String file = (e.getArchivo()==null || e.getArchivo().isBlank()) ? "<sin-archivo>" : e.getArchivo();
+            model.addRow(new Object[]{ e.getFase(), file, e.getLinea(), e.getColumna(), e.getMensaje() });
+        }
+
+        JTable table = new JTable(model);
+        table.setAutoCreateRowSorter(true);
+        table.setFillsViewportHeight(true);
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+        table.getColumnModel().getColumn(0).setPreferredWidth(90);   
+        table.getColumnModel().getColumn(1).setPreferredWidth(360);  
+        table.getColumnModel().getColumn(2).setPreferredWidth(60);   
+        table.getColumnModel().getColumn(3).setPreferredWidth(50);   
+        table.getColumnModel().getColumn(4).setPreferredWidth(700);  
+
+        table.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int viewRow = table.getSelectedRow();
+                    if (viewRow < 0) return;
+                    int row = table.convertRowIndexToModel(viewRow);
+                    String file = String.valueOf(model.getValueAt(row, 1));
+                    int line = (Integer) model.getValueAt(row, 2);
+                    int col  = (Integer) model.getValueAt(row, 3);
+                    openErrorLocationSimple(file, line, col);
+                }
+            }
+        });
+
+        JDialog dlg = new JDialog(this, "Errors", false);
+        dlg.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        dlg.getContentPane().add(new JScrollPane(table));
+        dlg.setSize(1300, 420);
+        dlg.setLocationRelativeTo(this);
+        dlg.setVisible(true);
+    }
+
+    private void openErrorLocationSimple(String file, int line, int col) {
+        if (file == null || file.isBlank() || "<sin-archivo>".equals(file)) return;
+        try {
+            java.nio.file.Path p = java.nio.file.Paths.get(file);
+            if (!p.isAbsolute() && projectRoot != null) p = projectRoot.resolve(p).normalize();
+            if (java.nio.file.Files.isRegularFile(p)) {
+                abrirEnEditor(p);
+                gotoLineCol(jTextPane1, Math.max(1, line), Math.max(1, col+1));
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "No se pudo abrir ubicación del error: " + ex.getMessage());
+        }
+    }
+
+    private void gotoLineCol(JTextPane tp, int line1, int col1) {
+        try {
+            String text = tp.getText();
+            int line = Math.max(1, line1);
+            int col  = Math.max(1, col1);
+            int idx = 0, curr = 1;
+            while (curr < line && idx < text.length()) {
+                int nl = text.indexOf('\n', idx);
+                if (nl < 0) { idx = text.length(); break; }
+                idx = nl + 1; curr++;
+            }
+            int pos = Math.min(text.length(), idx + (col - 1));
+            tp.setCaretPosition(pos);
+            tp.requestFocusInWindow();
+        } catch (Exception ignore) {}
+    }
+
+
+    private String paramsToString(MethodSymbol m) {
+        StringBuilder ps = new StringBuilder();
+        for (int i = 0; i < m.params.size(); i++) {
+            var p = m.params.get(i);
+            if (i > 0) ps.append(", ");
+            ps.append(showType(p.type)).append(" ").append(p.name);
+        }
+        return ps.toString();
+    }
+
+    private String showType(com.enmer.compi2.semantico.Type t) {
+        if (t == null) return "void";
+        var k = t.getKind();
+        if (k == com.enmer.compi2.semantico.Kind.CLASS) return t.getClassName();
+        if (k == com.enmer.compi2.semantico.Kind.STRING) return "String";
+        if (k == com.enmer.compi2.semantico.Kind.VOID)   return "void";
+        if (k == com.enmer.compi2.semantico.Kind.ERROR)  return "<error>";
+        return k.name().toLowerCase(); 
+    }
+
             
+    
             
     /**
      * @param args the command line arguments
@@ -286,11 +909,14 @@ public class IDERecaf extends javax.swing.JFrame {
     private javax.swing.JMenuItem closeProjectButton;
     private javax.swing.JMenuItem compileButton;
     private javax.swing.JMenuItem downloadButton;
+    private javax.swing.JButton jButton1;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JMenu jMenu1;
     private javax.swing.JMenu jMenu2;
     private javax.swing.JMenu jMenu3;
+    private javax.swing.JMenu jMenu4;
     private javax.swing.JMenuBar jMenuBar1;
+    private javax.swing.JMenuItem jMenuItem1;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JScrollPane jScrollPane3;

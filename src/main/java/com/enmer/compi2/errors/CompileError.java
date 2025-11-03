@@ -35,5 +35,10 @@ public class CompileError {
         return archivo;
     }
 
+    @Override
+    public String toString() {
+        String where = (archivo != null && !archivo.isBlank()) ? archivo : "<sin-archivo>";
+        return String.format("[%s] (%s:%d:%d) %s", fase, where, linea, columna, mensaje);
+    }
 
 }

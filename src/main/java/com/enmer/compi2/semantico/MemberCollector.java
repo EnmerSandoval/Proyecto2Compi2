@@ -5,6 +5,8 @@ import com.enmer.compi2.DecafOLC2Parser;
 import com.enmer.compi2.errors.CompileError;
 import com.enmer.compi2.errors.ErrorReporter;
 
+import java.util.HashSet;
+
 public class MemberCollector extends DecafOLC2BaseVisitor<Void> {
     private final GlobalScope global;
     private final ErrorReporter reporter;
@@ -64,21 +66,23 @@ public class MemberCollector extends DecafOLC2BaseVisitor<Void> {
         Type ret = (ctx.tipo() != null) ? resolveType(ctx.tipo()) : new Type(Kind.VOID);
 
         if (currentClass.methods.containsKey(name)) {
-            reporter.add(new CompileError(
-                    "Semantico",
+            reporter.add(new CompileError("Semantico",
                     "No se permite sobrecarga: método '" + name + "' repetido en clase '" + currentClass.name + "'.",
-                    ctx.start.getLine(),
-                    ctx.start.getCharPositionInLine(),
-                    currentFile
-            ));
+                    ctx.start.getLine(), ctx.start.getCharPositionInLine(), currentFile));
             return null;
         }
 
         MethodSymbol ms = new MethodSymbol(name, ret);
 
+        HashSet<String> seen = new java.util.HashSet<>();
         if (ctx.params() != null) {
             for (var p : ctx.params().param()) {
                 String pName = p.IDENT().getText();
+                if (!seen.add(pName)) {
+                    reporter.add(new CompileError("Semantico",
+                            "Parámetro duplicado '" + pName + "' en método '" + name + "'.",
+                            p.start.getLine(), p.start.getCharPositionInLine(), currentFile));
+                }
                 Type pType = resolveType(p.tipo());
                 ms.params.add(new VarSymbol(pName, pType));
             }
@@ -119,13 +123,25 @@ public class MemberCollector extends DecafOLC2BaseVisitor<Void> {
 
     private Type resolveType(DecafOLC2Parser.TipoContext ctx) {
         String txt = ctx.tipoBase().getText();
-        return switch (txt) {
-            case "int"     -> new Type(Kind.INT);
-            case "float"   -> new Type(Kind.FLOAT);
-            case "char"    -> new Type(Kind.CHAR);
-            case "boolean" -> new Type(Kind.BOOLEAN);
-            case "String"  -> new Type(Kind.STRING);
-            default        -> new Type(Kind.CLASS, txt);
-        };
+        switch (txt) {
+            case "int":     return new Type(Kind.INT);
+            case "float":   return new Type(Kind.FLOAT);
+            case "char":    return new Type(Kind.CHAR);
+            case "boolean": return new Type(Kind.BOOLEAN);
+            case "String":  return new Type(Kind.STRING);
+            default:
+                if (!global.hasClass(txt)) {
+                    reporter.add(new CompileError("Semantico",
+                            "Tipo de clase no declarado: '" + txt + "'.",
+                            ctx.start.getLine(), ctx.start.getCharPositionInLine(), currentFile));
+                    return new Type(Kind.ERROR);
+                }
+                return new Type(Kind.CLASS, txt);
+        }
     }
+
+
+
+
+
 }
