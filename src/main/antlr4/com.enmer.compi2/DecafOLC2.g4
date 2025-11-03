@@ -1,218 +1,243 @@
 grammar DecafOLC2;
 
- programa
-     : claseDecl+ EOF
-     ;
+programa
+    : claseDecl+ EOF
+    ;
 
- claseDecl
-     : 'class' IDENT ( 'extends' IDENT )? '{' miembroClase* '}'
-     ;
+claseDecl
+    : 'class' IDENT ( 'extends' IDENT )? '{' miembroClase* '}'
+    ;
 
- miembroClase
-     : campoDecl
-     | constructorDecl
-     | metodoDecl
-     ;
+miembroClase
+    : campoDecl
+    | constructorDecl
+    | metodoDecl
+    ;
 
- campoDecl
-     : modificador* tipo listaVars ';'
-     | modificador* 'var' IDENT ('=' expr)? ';'
-     ;
+campoDecl
+    : modificador* tipo listaVars ';'
+    | modificador* 'var' IDENT ('=' expr)? ';'
+    ;
 
- listaVars
-     : varInit (',' varInit)*
-     ;
+listaVars
+    : varInit (',' varInit)*
+    ;
 
- varInit
-     : IDENT ('=' expr)?
-     ;
+varInit
+    : IDENT ('=' expr)?
+    ;
 
- constructorDecl
-     : modificador* IDENT '(' params? ')' bloque
-     ;
+constructorDecl
+    : modificador* IDENT '(' params? ')' bloque
+    ;
 
- metodoDecl
-     : modificador* tipo IDENT '(' params? ')' bloque
-     | modificador* 'void' IDENT '(' params? ')' bloque
-     ;
+metodoDecl
+    : modificador* tipo IDENT '(' params? ')' bloque
+    | modificador* 'void' IDENT '(' params? ')' bloque
+    ;
 
- params
-     : param (',' param)*
-     ;
+params
+    : param (',' param)*
+    ;
 
- param
-     : tipo IDENT
-     ;
+param
+    : tipo IDENT
+    ;
 
- tipo
-     : tipoBase dims?
-     ;
+tipo
+    : tipoBase dims?
+    ;
 
- tipoBase
-     : 'int'
-     | 'float'
-     | 'char'
-     | 'boolean'
-     | 'String'
-     | IDENT
-     ;
+tipoBase
+    : 'int'
+    | 'float'
+    | 'char'
+    | 'boolean'
+    | 'String'
+    | IDENT
+    ;
 
- dims
-     : ('[' ']')+
-     ;
+dims
+    : ('[' ']')+
+    ;
 
- modificador
-     : 'public'
-     | 'private'
-     | 'protected'
-     | 'final'
-     ;
+modificador
+    : 'public'
+    | 'private'
+    | 'protected'
+    | 'final'
+    ;
 
- bloque
-     : '{' sentencia* '}'
-     ;
+bloque
+    : '{' sentencia* '}'
+    ;
 
- sentencia
-     : bloque
-     | ifStmt
-     | whileStmt
-     | doWhileStmt
-     | forStmt
-     | switchStmt
-     | 'break' ';'
-     | 'continue' ';'
-     | 'return' expr? ';'
-     | expr ';'
-     | ';'
-     ;
+sentencia
+    : bloque
+    | ifStmt
+    | whileStmt
+    | doWhileStmt
+    | forStmt
+    | switchStmt
+    | 'break' ';'
+    | 'continue' ';'
+    | 'return' expr? ';'
+    | expr ';'
+    | ';'
+    ;
 
- ifStmt
-     : 'if' '(' expr ')' sentencia ('else' sentencia)?
-     ;
+ifStmt
+    : 'if' '(' expr ')' sentencia ('else' sentencia)?
+    ;
 
- whileStmt
-     : 'while' '(' expr ')' sentencia
-     ;
+whileStmt
+    : 'while' '(' expr ')' sentencia
+    ;
 
- doWhileStmt
-     : 'do' sentencia 'while' '(' expr ')' ';'
-     ;
+doWhileStmt
+    : 'do' sentencia 'while' '(' expr ')' ';'
+    ;
 
- forStmt
-     : 'for' '(' forInit? ';' expr? ';' forUpdate? ')' sentencia
-     ;
+forStmt
+    : 'for' '(' forInit? ';' expr? ';' forUpdate? ')' sentencia
+    ;
 
- forInit
-     : campoDecl
-     | expr (',' expr)*
-     ;
+forInit
+    : campoDecl
+    | expr (',' expr)*
+    ;
 
- forUpdate
-     : expr (',' expr)*
-     ;
+forUpdate
+    : expr (',' expr)*
+    ;
 
- switchStmt
-     : 'switch' '(' expr ')' '{' switchItem* '}'
-     ;
+switchStmt
+    : 'switch' '(' expr ')' '{' switchItem* '}'
+    ;
 
- switchItem
-     : switchLabel sentencia*
-     ;
+switchItem
+    : switchLabel sentencia*
+    ;
 
- switchLabel
-     : 'case' literal ':'
-     | 'default' ':'
-     ;
+switchLabel
+    : 'case' literal ':'
+    | 'default' ':'
+    ;
 
- expr
-     : asignacionExpr
-     ;
 
- asignacionExpr
-     : orExpr (opAsig asignacionExpr)?
-     ;
+expr
+    : asignacionExpr
+    ;
 
- opAsig
-     : '='
-     | '+=' | '-=' | '*=' | '/=' | '%='
-     ;
+asignacionExpr
+    : orExpr (opAsig asignacionExpr)?
+    ;
 
- orExpr
-     : andExpr ( '||' andExpr )*
-     ;
+opAsig
+    : '='
+    | '+=' | '-=' | '*=' | '/=' | '%='
+    ;
 
- andExpr
-     : igualdadExpr ( '&&' igualdadExpr )*
-     ;
+orExpr
+    : andExpr ( '||' andExpr )*
+    ;
 
- igualdadExpr
-     : relExpr ( ('==' | '!=') relExpr )*
-     ;
+andExpr
+    : igualdadExpr ( '&&' igualdadExpr )*
+    ;
 
- relExpr
-     : aditivoExpr ( ('<' | '>' | '<=' | '>=') aditivoExpr )*
-     ;
+igualdadExpr
+    : relExpr ( ('==' | '!=') relExpr )*
+    ;
 
- aditivoExpr
-     : multExpr (('+'|'-') multExpr)*
-     ;
+relExpr
+    : aditivoExpr ( ('<' | '>' | '<=' | '>=') aditivoExpr )*
+    ;
 
- multExpr
-     : unaryExpr (('*'|'/'|'%') unaryExpr)*
-     ;
+aditivoExpr
+    : multExpr (('+'|'-') multExpr)*
+    ;
 
- unaryExpr
-     : ('+'|'-'|'!') unaryExpr
-     | postfixExpr
-     ;
+multExpr
+    : unaryExpr (('*'|'/'|'%') unaryExpr)*
+    ;
 
- postfixExpr
-     : primaria postfixOp*
-     ;
+unaryExpr
+    : ('+'|'-'|'!') unaryExpr
+    | postfixExpr
+    ;
 
- postfixOp
-     : '.' IDENT '(' args? ')'
-     | '.' IDENT
-     | '[' expr ']'
-     ;
+postfixExpr
+    : primaria postfixOp*
+    ;
 
- primaria
-     : literal
-     | 'new' tipoBase '(' args? ')'
-     | 'new' tipoBase '[' expr ']'
-     | IDENT
-     | '(' expr ')'
-     ;
+postfixOp
+    : '.' IDENT '(' args? ')'
+    | '.' IDENT
+    | '[' expr ']'
+    ;
 
- args
-     : expr (',' expr)*
-     ;
+primaria
+    : literal
+    | 'new' tipoBase '(' args? ')'
+    | 'new' tipoBase ('[' expr ']')+
+    | IDENT
+    | '(' expr ')'
+    | 'this'
+    | 'super'
+    ;
 
- literal
-     : INT_LIT
-     | FLOAT_LIT
-     | CHAR_LIT
-     | STRING_LIT
-     | 'true'
-     | 'false'
-     | 'null'
-     ;
+args
+    : expr (',' expr)*
+    ;
 
- INT_LIT     : [0-9]+ ;
- FLOAT_LIT   : [0-9]+ '.' [0-9]* ;
- CHAR_LIT    : '\'' ( ~['\\] | '\\' . ) '\'' ;
- STRING_LIT  : '"' ( ~["\\] | '\\' . )* '"' ;
+literal
+    : INT_LIT
+    | FLOAT_LIT
+    | CHAR_LIT
+    | STRING_LIT
+    | 'true'
+    | 'false'
+    | 'null'
+    ;
 
- IDENT
-     : [a-zA-Z_] [a-zA-Z_0-9]*
-     ;
 
- WS          : [ \t\r\n]+ -> skip ;
- LINE_COMMENT: '//' ~[\r\n]* -> skip ;
- COMMENT     : '/*' .*? '*/' -> skip ;
+IDENT
+    : LETTER (LETTER | DIGIT | '_')*
+    ;
 
- PLUS    : '+' ;
- MINUS   : '-' ;
- STAR    : '*' ;
- DIV     : '/' ;
- MOD     : '%' ;
+INT_LIT
+    : DIGIT+
+    ;
+
+FLOAT_LIT
+    : DIGIT+ '.' DIGIT* EXPONENT?
+    | DIGIT+ EXPONENT
+    ;
+
+CHAR_LIT
+    : '\'' ( ESC_SEQ | ~['\\\r\n] ) '\''
+    ;
+
+STRING_LIT
+    : '"' ( ESC_SEQ | ~["\\\r\n] )* '"'
+    ;
+
+WS
+    : [ \t\r\n\f]+ -> skip
+    ;
+
+LINE_COMMENT
+    : '//' ~[\r\n]* -> skip
+    ;
+
+COMMENT
+    : '/*' .*? '*/' -> skip
+    ;
+
+
+fragment DIGIT     : [0-9] ;
+fragment LETTER    : [a-zA-Z_] ;
+fragment EXPONENT  : [eE] [+\-]? DIGIT+ ;
+fragment ESC_SEQ   : '\\' ( ['"\\nrtbf] | 'u' HEX HEX HEX HEX ) ;
+fragment HEX       : [0-9a-fA-F] ;
